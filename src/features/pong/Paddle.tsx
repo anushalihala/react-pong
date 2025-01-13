@@ -1,5 +1,5 @@
-import React from 'react';
-import { Graphics } from '@inlet/react-pixi';
+import React from "react";
+import { Graphics } from "@inlet/react-pixi";
 
 type Props = {
   player: {
@@ -22,8 +22,9 @@ function Paddle(props: Props) {
         // clear the graphics
         g.clear();
         // start drawing
-        if (position === 'left') g.beginFill(0xf977a3);
-        if (position === 'right') g.beginFill(0x66ddd4);
+        if (position === "left") g.beginFill(0xf977a3);
+        if (position === "right") g.beginFill(0x66ddd4);
+        if (position === "middle") g.beginFill(0xffffff);
         g.drawRect(x, y, width, height);
       }}
     />

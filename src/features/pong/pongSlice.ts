@@ -10,6 +10,8 @@ const PADDLE_HEIGHT = 100;
 const PADDLE_OFFSET_X = 20;
 const PADDLE_OFFSET_Y = 50;
 const PADDLE_SPEED = 20;
+const OBSTACLE_COUNT = 2;
+const OBSTACLE_LENGTH = 100;
 
 export type ButtonProps = {
   x: number;
@@ -17,6 +19,25 @@ export type ButtonProps = {
   top_x: number;
   top_y: number;
   text: string;
+};
+
+export type PaddleLocation = {
+  y: number;
+};
+
+export type Location = {
+  x: number;
+  y: number;
+};
+
+export type BallMoveState = {
+  x: number;
+  y: number;
+  winner: string;
+  status: Status;
+  myScore: number;
+  otherScore: number;
+  obstacles: Array<ObstacleProps>;
 };
 
 export type PaddleProps = {
@@ -27,6 +48,13 @@ export type PaddleProps = {
   width: number;
   height: number;
   score: number;
+};
+
+export type ObstacleProps = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 };
 
 type Status = "pre-start" | "game-over" | "paused" | "playing";
@@ -63,6 +91,7 @@ export interface PongState {
   status: Status;
   winner: PaddleProps | null;
   winningScore: number;
+  obstacles: Array<ObstacleProps>;
 }
 
 const randomDirection = () => {
@@ -139,6 +168,16 @@ const initialState: PongState = {
   status: "pre-start",
   winner: null,
   winningScore: 5,
+  obstacles: [],
+};
+
+const hasOverlap = (obstacle, ball) => {
+  var aLeftOfB = obstacle["x"] + OBSTACLE_LENGTH < ball.x - ball.radius;
+  var aRightOfB = obstacle["x"] > ball.x + ball.radius;
+  var aAboveB = obstacle["y"] > ball.y + ball.radius;
+  var aBelowB = obstacle["y"] + OBSTACLE_LENGTH < ball.y - ball.radius;
+
+  return !(aLeftOfB || aRightOfB || aAboveB || aBelowB);
 };
 
 export const pongSlice = createSlice({
@@ -147,6 +186,31 @@ export const pongSlice = createSlice({
   reducers: {
     startGame: (state) => {
       state.status = "playing";
+      // create obstacles
+      for (var i = 0; i < OBSTACLE_COUNT; i++) {
+        while (true) {
+          var obstacle = {
+            width: OBSTACLE_LENGTH,
+            height: OBSTACLE_LENGTH,
+            x: 0,
+            y: 0,
+          };
+          var rand1 = Math.random();
+          var rand2 = Math.random();
+          obstacle["y"] = Math.floor((GAME_HEIGHT - OBSTACLE_LENGTH) * rand1);
+          obstacle["x"] =
+            Math.floor(
+              (GAME_WIDTH - OBSTACLE_LENGTH - 2 * PADDLE_WIDTH) * rand2
+            ) + PADDLE_WIDTH;
+
+          if (hasOverlap(obstacle, state.ball)) {
+            continue;
+          } else {
+            state.obstacles.push({ ...obstacle });
+            break;
+          }
+        }
+      }
     },
     pauseGame: (state) => {
       state.status = "paused";
@@ -190,6 +254,32 @@ export const pongSlice = createSlice({
       // Bottom of the board
       if (player.y + PADDLE_HEIGHT > GAME_HEIGHT) {
         player.y = GAME_HEIGHT - PADDLE_HEIGHT;
+      }
+    },
+    moveOpponent: (state, action: PayloadAction<PaddleLocation>) => {
+      // state.players["right"].x = action.payload.x;
+      state.players["right"].y = action.payload.y;
+      state.status = "playing";
+    },
+    receiveBallMovement: (state, action: PayloadAction<BallMoveState>) => {
+      state.ball.x =
+        action.payload.x > GAME_WIDTH / 2
+          ? GAME_WIDTH / 2 - (action.payload.x - GAME_WIDTH / 2)
+          : GAME_WIDTH / 2 + (GAME_WIDTH / 2 - action.payload.x);
+      state.ball.y = action.payload.y;
+      state.winner =
+        action.payload.winner == "right"
+          ? { ...state.players["right"] }
+          : { ...state.players["left"] };
+      state.winner = action.payload.winner == "none" ? null : state.winner;
+      state.status = action.payload.status;
+      state.players["left"].score = action.payload.myScore;
+      state.players["right"].score = action.payload.otherScore;
+      if (state.obstacles.length < 1) {
+        state.obstacles = [...action.payload.obstacles].map((obs) => {
+          const new_centre_x = GAME_WIDTH - obs.x - obs.width;
+          return { ...obs, x: new_centre_x };
+        });
       }
     },
     moveBall: (state) => {
@@ -278,6 +368,17 @@ export const pongSlice = createSlice({
           // contact.play();
         }
       }
+
+      for (var i = 0; i < state.obstacles.length; i++) {
+        var obst = state.obstacles[i];
+        if (hasOverlap(obst, state.ball)) {
+          state.ball.y_speed = -state.ball.y_speed;
+          state.ball.x_speed = -state.ball.x_speed;
+          state.ball.x += state.ball.x_speed;
+          state.ball.y += state.ball.y_speed;
+          break;
+        }
+      }
     },
   },
 });
@@ -293,12 +394,16 @@ export const {
   keyUp,
   movePaddleUp,
   movePaddleDown,
+  receiveBallMovement,
   moveBall,
+  moveOpponent,
 } = pongSlice.actions;
 
 // The function below is called a selector and allows us to select a value from
 // the state. Selectors can also be defined inline where they're used instead of
 // in the slice file. For example: `useSelector((state) => state.counter.value)`
+export const selectObstacles = (state: AppState) => state.pong.obstacles;
+
 export const selectWinner = (state: AppState) => state.pong.winner;
 
 export const selectStatus = (state: AppState) => state.pong.status;

@@ -21,7 +21,17 @@ import {
 export default function Pong(props) {
   const app = useApp();
 
-  const { winner, players, status, config, buttons, ball, dispatch } = props;
+  const {
+    winner,
+    players,
+    status,
+    config,
+    buttons,
+    ball,
+    obstacles,
+    dispatch,
+    pingPongService,
+  } = props;
 
   const tick = () => {
     if (!winner) {
@@ -44,21 +54,24 @@ export default function Pong(props) {
       case "KeyA": // A
         // Move the left paddle up
         dispatch(movePaddleUp("left"));
+        pingPongService.movePaddle(players["left"]["y"]);
         break;
       case "KeyZ": // Z
         // Move the left paddle down
         dispatch(movePaddleDown("left"));
+        pingPongService.movePaddle(players["left"]["y"]);
         break;
       case "ArrowUp": // Arrow Up Key
         // Move the left paddle up
-        dispatch(movePaddleUp("right"));
+        dispatch(movePaddleUp("left"));
+        pingPongService.movePaddle(players["left"]["y"]);
         break;
       case "ArrowDown": //Arrow down key
         // Move the left paddle down
-        dispatch(movePaddleDown("right"));
+        dispatch(movePaddleDown("left"));
+        pingPongService.movePaddle(players["left"]["y"]);
         break;
       default:
-        console.log("Key", event);
         return; // Do nothing
     }
   };
@@ -87,11 +100,31 @@ export default function Pong(props) {
   };
 
   useTick((delta) => {
-    if (!winner && status === "playing") {
+    if (
+      !winner &&
+      status === "playing" &&
+      pingPongService.playerName == "player1"
+    ) {
       dispatch(moveBall());
     } else if (winner) {
       dispatch(endGame());
       app.ticker.remove(tick);
+    }
+
+    if (pingPongService.playerName == "player1") {
+      pingPongService.moveBall(
+        ball.x,
+        ball.y,
+        status,
+        winner?.position ?? "none",
+        pingPongService.playerName == "player1"
+          ? players["left"].score
+          : players["right"].score,
+        pingPongService.playerName == "player2"
+          ? players["left"].score
+          : players["right"].score,
+        obstacles
+      );
     }
   });
 
@@ -130,6 +163,9 @@ export default function Pong(props) {
       />
       <Paddle player={players.left} />
       <Paddle player={players.right} />
+      {obstacles.map((ob) => (
+        <Paddle player={{ ...ob, position: "middle" }}></Paddle>
+      ))}
       {status === "pre-start" && (
         <>
           <Text
@@ -148,15 +184,22 @@ export default function Pong(props) {
               })
             }
           />
-          <Button data={buttons.start} action={() => start()} />
+          {pingPongService.playerName == "player1" ? (
+            <Button data={buttons.start} action={() => start()} />
+          ) : (
+            <Button
+              data={{ ...buttons.start, text: "Waiting" }}
+              action={() => {}}
+            />
+          )}
         </>
       )}
-      {status === "paused" && (
+      {/* {status === "paused" && (
         <>
           <Button data={buttons.resume} action={cResumeGame} />
           <Ball data={ball} />
         </>
-      )}
+      )} */}
       {status === "playing" && <Ball data={ball} />}
       {status === "game-over" && (
         <>
@@ -182,7 +225,7 @@ export default function Pong(props) {
               })
             }
           />
-          <Button data={buttons.restart} action={() => cRestartGame()} />
+          {/* <Button data={buttons.restart} action={() => cRestartGame()} /> */}
         </>
       )}
     </Container>
